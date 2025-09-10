@@ -3,15 +3,18 @@
 import { useState, useEffect } from 'react';
 
 interface SurveyResponse {
-  startDate: string;
-  endDate: string;
-  recordedDate: string;
-  responseId: string;
-  email: string;
-  gender: string;
-  tier1Person1: string;
-  tier2Person1: string;
-  tier3Person1: string;
+  id?: number;
+  response_id: string;
+  day?: string | null;
+  email?: string | null;
+  blacklisted?: boolean;
+  tier1_person?: string | null;
+  tier2_person?: string | null;
+  tier3_person?: string | null;
+  gender?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  recorded_date?: string | null;
 }
 
 export default function MainPage() {
@@ -19,15 +22,63 @@ export default function MainPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const updateDay = async (responseId: string, day: string) => {
+    try {
+      const response = await fetch('/api/supabase', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ responseId, day: day || null }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update day');
+      }
+
+      // Update local state
+      setResponses(prev => 
+        prev.map(r => 
+          r.response_id === responseId 
+            ? { ...r, day: day || null }
+            : r
+        )
+      );
+    } catch (error) {
+      console.error('Error updating day:', error);
+    }
+  };
+
   useEffect(() => {
-    const fetchResponses = async () => {
+    const fetchAndSyncResponses = async () => {
       try {
-        const response = await fetch('/api/qualtrics');
-        if (!response.ok) {
-          throw new Error('Failed to fetch survey responses');
+        // Step 1: Fetch latest data from Qualtrics
+        const qualtricsResponse = await fetch('/api/qualtrics');
+        if (!qualtricsResponse.ok) {
+          throw new Error('Failed to fetch Qualtrics data');
         }
-        const data = await response.json();
-        setResponses(data.responses);
+        const qualtricsData = await qualtricsResponse.json();
+
+        // Step 2: Sync to Supabase
+        const syncResponse = await fetch('/api/supabase', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ responses: qualtricsData.responses }),
+        });
+
+        if (!syncResponse.ok) {
+          throw new Error('Failed to sync to database');
+        }
+
+        // Step 3: Fetch participants from Supabase (includes day tracking)
+        const participantsResponse = await fetch('/api/supabase');
+        if (!participantsResponse.ok) {
+          throw new Error('Failed to fetch participants');
+        }
+        const participantsData = await participantsResponse.json();
+        setResponses(participantsData.participants);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
@@ -35,7 +86,7 @@ export default function MainPage() {
       }
     };
 
-    fetchResponses();
+    fetchAndSyncResponses();
   }, []);
 
   if (loading) {
@@ -68,20 +119,32 @@ export default function MainPage() {
               <th className="px-4 py-2 border-b text-left text-sm font-medium text-gray-700">Tier 1 Person</th>
               <th className="px-4 py-2 border-b text-left text-sm font-medium text-gray-700">Tier 2 Person</th>
               <th className="px-4 py-2 border-b text-left text-sm font-medium text-gray-700">Tier 3 Person</th>
+              <th className="px-4 py-2 border-b text-left text-sm font-medium text-gray-700">Study Day</th>
               <th className="px-4 py-2 border-b text-left text-sm font-medium text-gray-700">Recorded Date</th>
             </tr>
           </thead>
           <tbody>
             {responses.map((response) => (
-              <tr key={response.responseId} className="hover:bg-gray-50">
-                <td className="px-4 py-2 border-b text-sm text-gray-900">{response.responseId}</td>
+              <tr key={response.response_id} className="hover:bg-gray-50">
+                <td className="px-4 py-2 border-b text-sm text-gray-900">{response.response_id}</td>
                 <td className="px-4 py-2 border-b text-sm text-gray-900">{response.email}</td>
                 <td className="px-4 py-2 border-b text-sm text-gray-900">{response.gender}</td>
-                <td className="px-4 py-2 border-b text-sm text-gray-900">{response.tier1Person1}</td>
-                <td className="px-4 py-2 border-b text-sm text-gray-900">{response.tier2Person1}</td>
-                <td className="px-4 py-2 border-b text-sm text-gray-900">{response.tier3Person1}</td>
+                <td className="px-4 py-2 border-b text-sm text-gray-900">{response.tier1_person}</td>
+                <td className="px-4 py-2 border-b text-sm text-gray-900">{response.tier2_person}</td>
+                <td className="px-4 py-2 border-b text-sm text-gray-900">{response.tier3_person}</td>
                 <td className="px-4 py-2 border-b text-sm text-gray-900">
-                  {new Date(response.recordedDate).toLocaleString()}
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={response.day || ''}
+                    onChange={(e) => updateDay(response.response_id, e.target.value)}
+                    className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
+                    placeholder="Day"
+                  />
+                </td>
+                <td className="px-4 py-2 border-b text-sm text-gray-900">
+                  {response.recorded_date ? new Date(response.recorded_date).toLocaleString() : ''}
                 </td>
               </tr>
             ))}

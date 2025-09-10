@@ -1,7 +1,7 @@
 create table public.long_fa25_survey_responses (
   id serial not null,
   response_id text not null,
-  day date null,
+  day text null,
   email text null,
   blacklisted boolean null default false,
   tier1_person text null,
