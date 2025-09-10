@@ -19,6 +19,7 @@ interface SurveyResponse {
   start_date?: string | null;
   end_date?: string | null;
   recorded_date?: string | null;
+  passkey_three_1?: string | null;
 }
 
 export async function POST(request: NextRequest) {
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
           start_date: response.startDate,
           end_date: response.endDate,
           recorded_date: response.recordedDate,
+          passkey_three_1: response.passkeyThree1,
           day: null,
           blacklisted: false,
         };

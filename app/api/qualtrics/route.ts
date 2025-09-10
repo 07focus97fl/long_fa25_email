@@ -106,6 +106,7 @@ export async function GET() {
       tier1Person1: response.values?.QID29_1 || '',
       tier2Person1: response.values?.QID30_1 || '',
       tier3Person1: response.values?.QID31_1 || '',
+      passkeyThree1: response.values?.QID61_1 || '',
     })) || [];
 
     return NextResponse.json({ responses });
