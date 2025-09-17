@@ -1,18 +1,23 @@
 interface Participant {
-  email: string;
+  email?: string | null;
   tier1_person?: string | null;
   tier2_person?: string | null;
   tier3_person?: string | null;
   gender?: string | null;
+  ai_gender?: string | null;
   passkey_three_1?: string | null;
+  day?: string | null;
 }
 
 export function generateDailySurveyEmail(participant: Participant, day: number): { subject: string; text: string } {
   const surveyLink = `https://fsu.qualtrics.com/jfe/form/SV_54iR2R2FGOVLyx8?email=${encodeURIComponent(participant.email || '')}&tier1=${encodeURIComponent(participant.tier1_person || '')}&tier2=${encodeURIComponent(participant.tier2_person || '')}&tier3=${encodeURIComponent(participant.tier3_person || '')}&QID61_1=${encodeURIComponent(participant.passkey_three_1 || 'optimisticduck')}`;
   
-  const chatLink = participant.gender === '1' 
-    ? 'https://long-sp25-chatbot.vercel.app/seb/'
-    : 'https://long-sp25-chatbot.vercel.app/';
+  // Check if gender is "Male" from Supabase
+  const isMale = participant.gender?.toLowerCase() === 'male';
+  
+  const chatLink = isMale
+    ? 'https://long-fa25-chatbot.vercel.app/seb'
+    : 'https://long-fa25-chatbot.vercel.app/';
   
   const passkey = participant.passkey_three_1 || 'optimisticduck';
 
@@ -86,24 +91,31 @@ export function generateEmail(type: EmailType, participant: Participant, day?: n
   }
 }
 
-export function generateEmailByDay(participant: Participant): { subject: string; text: string } | null {
+export function generateEmailByDay(participant: Participant): { subject: string; text: string; isNoEmailDay?: boolean } | null {
   const day = parseInt(participant.day as string);
-  
+
   if (!day || day < 1) {
     return null; // No email if day is not set or invalid
   }
-  
+
   if (day >= 1 && day <= 21) {
     // Daily survey emails (Days 1-21)
     return generateDailySurveyEmail(participant, day);
   } else if (day === 22) {
     // Check-in survey (Day 22)
     return generateCheckInSurveyEmail();
+  } else if (day >= 23 && day <= 35) {
+    // No email days (23-35) - return special indicator
+    return {
+      subject: '',
+      text: '',
+      isNoEmailDay: true
+    };
   } else if (day === 36) {
     // Final survey (Day 36)
     return generateFinalSurveyEmail();
   }
-  
-  // No email for other days (23-35, 37+)
+
+  // No processing for days beyond study period (37+)
   return null;
 }

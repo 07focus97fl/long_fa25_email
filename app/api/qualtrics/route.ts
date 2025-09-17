@@ -1,5 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+interface QualtricsResponse {
+  responseId: string;
+  values?: {
+    startDate?: string;
+    endDate?: string;
+    recordedDate?: string;
+    QID5_TEXT?: string;
+    QID10?: number;
+    QID29_1?: string;
+    QID30_1?: string;
+    QID31_1?: string;
+    QID61_1?: string;
+  };
+}
+
 export async function GET() {
   try {
     const apiToken = process.env.QUALTRICS_API_TOKEN;
@@ -96,7 +111,7 @@ export async function GET() {
     }
     
     // Extract and format the responses using the actual field names
-    const responses = data.responses?.map((response: any) => ({
+    const responses = data.responses?.map((response: QualtricsResponse) => ({
       startDate: response.values?.startDate || '',
       endDate: response.values?.endDate || '',
       recordedDate: response.values?.recordedDate || '',
