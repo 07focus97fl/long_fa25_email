@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_ANON_KEY!
+);
 
 interface EmailRequest {
   emails: Array<{
@@ -58,19 +64,13 @@ async function sendEmailsBatch(emails: Array<{to: string; subject: string; text:
 
             // Update day in database
             try {
-              const updateResponse = await fetch('/api/supabase', {
-                method: 'PATCH',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  responseId: email.participantId,
-                  day: newDay.toString()
-                }),
-              });
+              const { error } = await supabase
+                .from('long_fa25_survey_responses')
+                .update({ day: newDay.toString() })
+                .eq('response_id', email.participantId);
 
-              if (!updateResponse.ok) {
-                console.error(`Failed to update day for participant ${email.participantId}`);
+              if (error) {
+                console.error(`Failed to update day for participant ${email.participantId}:`, error);
               }
             } catch (updateError) {
               console.error(`Error updating day for participant ${email.participantId}:`, updateError);
@@ -107,19 +107,13 @@ async function sendEmailsBatch(emails: Array<{to: string; subject: string; text:
 
           // Update day in database
           try {
-            const updateResponse = await fetch('/api/supabase', {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                responseId: email.participantId,
-                day: newDay.toString()
-              }),
-            });
+            const { error } = await supabase
+              .from('long_fa25_survey_responses')
+              .update({ day: newDay.toString() })
+              .eq('response_id', email.participantId);
 
-            if (!updateResponse.ok) {
-              console.error(`Failed to update day for participant ${email.participantId}`);
+            if (error) {
+              console.error(`Failed to update day for participant ${email.participantId}:`, error);
             }
           } catch (updateError) {
             console.error(`Error updating day for participant ${email.participantId}:`, updateError);
