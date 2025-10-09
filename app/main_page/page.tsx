@@ -46,6 +46,11 @@ export default function MainPage() {
   } | null>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [recentlyEmailed, setRecentlyEmailed] = useState<Set<string>>(new Set());
+  const [surveyCompletions, setSurveyCompletions] = useState<{
+    checkin: Set<string>;
+    final: Set<string>;
+  }>({ checkin: new Set(), final: new Set() });
+  const [checkingCompletions, setCheckingCompletions] = useState(false);
 
   const updateDay = async (responseId: string, day: string) => {
     try {
@@ -243,6 +248,28 @@ export default function MainPage() {
     }, 2000); // Poll every 2 seconds
   };
 
+  const fetchSurveyCompletions = async () => {
+    setCheckingCompletions(true);
+    try {
+      const completionResponse = await fetch('/api/survey-completion');
+      if (!completionResponse.ok) {
+        console.error('Failed to fetch survey completions');
+        return;
+      }
+      const completionData = await completionResponse.json();
+
+      // Convert arrays to Sets and normalize emails for matching
+      setSurveyCompletions({
+        checkin: new Set(completionData.checkinEmails.map((email: string) => email.toLowerCase().trim())),
+        final: new Set(completionData.finalEmails.map((email: string) => email.toLowerCase().trim()))
+      });
+    } catch (err) {
+      console.error('Error fetching survey completions:', err);
+    } finally {
+      setCheckingCompletions(false);
+    }
+  };
+
   useEffect(() => {
     const fetchAndSyncResponses = async () => {
       try {
@@ -273,6 +300,9 @@ export default function MainPage() {
         }
         const participantsData = await participantsResponse.json();
         setResponses(participantsData.participants);
+
+        // Step 4: After participants are loaded, fetch survey completion status
+        fetchSurveyCompletions();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
@@ -422,6 +452,8 @@ export default function MainPage() {
               <th className="px-4 py-2 border-b text-left text-sm font-medium text-gray-700">Tier 3 Person</th>
               <th className="px-4 py-2 border-b text-left text-sm font-medium text-gray-700">Passkey</th>
               <th className="px-4 py-2 border-b text-left text-sm font-medium text-gray-700">Study Day</th>
+              <th className="px-4 py-2 border-b text-center text-sm font-medium text-gray-700">Check-in</th>
+              <th className="px-4 py-2 border-b text-center text-sm font-medium text-gray-700">Final</th>
               <th className="px-4 py-2 border-b text-left text-sm font-medium text-gray-700">Recorded Date</th>
             </tr>
           </thead>
@@ -430,7 +462,17 @@ export default function MainPage() {
               const canEmail = canReceiveEmail(response);
               const isDisabled = !response.email || response.blacklisted || !canEmail;
               const wasRecentlyEmailed = recentlyEmailed.has(response.response_id);
-              
+
+              // Determine survey completion status
+              const currentDay = parseInt(response.day as string) || 0;
+              const normalizedEmail = response.email?.toLowerCase().trim() || '';
+
+              const checkinCompleted = surveyCompletions.checkin.has(normalizedEmail);
+              const finalCompleted = surveyCompletions.final.has(normalizedEmail);
+
+              const checkinEligible = currentDay >= 22;
+              const finalEligible = currentDay >= 36;
+
               return (
               <tr key={response.response_id} className={`hover:bg-gray-50 ${response.blacklisted ? 'bg-red-50' : ''} ${!canEmail && response.day ? 'bg-yellow-50' : ''} ${wasRecentlyEmailed ? 'bg-green-50 border-l-4 border-green-400' : ''}`}>
                 <td className="px-4 py-2 border-b text-sm text-gray-900">
@@ -469,6 +511,28 @@ export default function MainPage() {
                       </div>
                     )}
                   </div>
+                </td>
+                <td className="px-4 py-2 border-b text-sm text-center">
+                  {checkingCompletions ? (
+                    <span className="text-gray-400">...</span>
+                  ) : !checkinEligible ? (
+                    <span className="text-gray-400">—</span>
+                  ) : checkinCompleted ? (
+                    <span className="text-green-600 font-bold text-lg">✓</span>
+                  ) : (
+                    <span className="text-red-600 font-bold text-lg">✗</span>
+                  )}
+                </td>
+                <td className="px-4 py-2 border-b text-sm text-center">
+                  {checkingCompletions ? (
+                    <span className="text-gray-400">...</span>
+                  ) : !finalEligible ? (
+                    <span className="text-gray-400">—</span>
+                  ) : finalCompleted ? (
+                    <span className="text-green-600 font-bold text-lg">✓</span>
+                  ) : (
+                    <span className="text-red-600 font-bold text-lg">✗</span>
+                  )}
                 </td>
                 <td className="px-4 py-2 border-b text-sm text-gray-900">
                   {response.recorded_date ? new Date(response.recorded_date).toLocaleString() : ''}
