@@ -4,7 +4,7 @@ interface QualtricsResponse {
   responseId: string;
   values?: {
     mail?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
